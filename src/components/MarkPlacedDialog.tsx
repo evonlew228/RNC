@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, X, PartyPopper } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { formatSGD } from '@/lib/format';
+import { commissionPool, consultantCommission, formatSGD } from '@/lib/format';
 import { ROLE_LABELS } from '@/lib/supabase/types';
 
 interface ConsultantSplit {
@@ -128,7 +128,7 @@ export function MarkPlacedDialog({
       payload: {
         type: 'placed',
         fee,
-        splits: splits.map((s) => ({ name: s.full_name, pct: s.pct, amount: Math.round((fee * s.pct) / 100) })),
+        splits: splits.map((s) => ({ name: s.full_name, pct: s.pct, amount: consultantCommission(fee, s.pct) })),
       },
     });
 
@@ -174,7 +174,7 @@ export function MarkPlacedDialog({
                 <PartyPopper className="size-12 text-emerald-600 mx-auto" />
                 <h3 className="mt-3 font-semibold text-lg text-slate-900">Deal closed!</h3>
                 <p className="text-sm text-muted mt-1">
-                  Splits recorded · {formatSGD(fee)} in fees
+                  Splits recorded · {formatSGD(commissionPool(fee))} commission paid out
                 </p>
               </div>
             ) : (
@@ -190,9 +190,15 @@ export function MarkPlacedDialog({
                 </div>
 
                 <div className="p-5 space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                    <span className="text-sm text-emerald-800">Total fee</span>
-                    <span className="font-semibold text-emerald-900">{formatSGD(fee)}</span>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-border rounded-lg text-sm">
+                      <span className="text-slate-600">Fee revenue (firm bills client)</span>
+                      <span className="font-medium text-slate-900">{formatSGD(fee)}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-sm">
+                      <span className="text-emerald-800">Commission pool (10% of fee)</span>
+                      <span className="font-semibold text-emerald-900">{formatSGD(commissionPool(fee))}</span>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -216,7 +222,7 @@ export function MarkPlacedDialog({
                           />
                           <span className="text-sm text-slate-700">%</span>
                           <span className="text-sm font-medium text-slate-900 w-24 text-right">
-                            {formatSGD(Math.round((fee * s.pct) / 100))}
+                            {formatSGD(consultantCommission(fee, s.pct))}
                           </span>
                         </div>
                       </div>

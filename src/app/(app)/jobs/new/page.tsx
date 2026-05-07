@@ -21,7 +21,7 @@ export default function NewJobPage() {
     jd_summary: '',
     criteria: '',
     annual_package_sgd: 80000,
-    fee_pct: 20,
+    fee_pct: 15, // firm-wide standard: 15% of annual salary
     co_broke_open: true,
     originator_pct: 60,
   });

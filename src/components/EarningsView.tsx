@@ -43,8 +43,8 @@ export function EarningsView({
 
   function exportCsv() {
     const header = isDirector
-      ? ['Date placed', 'Candidate', 'Role', 'Client', 'Total fee SGD', 'Consultant', 'Role on deal', 'Split %', 'Amount SGD']
-      : ['Date placed', 'Candidate', 'Role', 'Client', 'Total fee SGD', 'Role on deal', 'Split %', 'Amount SGD'];
+      ? ['Date placed', 'Candidate', 'Role', 'Client', 'Fee revenue SGD', 'Consultant', 'Role on deal', 'Split %', 'Commission SGD']
+      : ['Date placed', 'Candidate', 'Role', 'Client', 'Fee revenue SGD', 'Role on deal', 'Split %', 'Commission SGD'];
     const lines = filtered.map((r) => {
       const date = new Date(r.placed_at).toISOString().slice(0, 10);
       const fields = isDirector
@@ -71,9 +71,9 @@ export function EarningsView({
       <div className="grid grid-cols-3 gap-4">
         <Kpi
           icon={Wallet}
-          label={isDirector ? 'Total fees paid out' : 'My earnings'}
+          label={isDirector ? 'Total commission paid out' : 'My commission'}
           value={formatSGD(totals.total, { compact: true })}
-          hint={`${range === 'all' ? 'lifetime' : `last ${range}`}`}
+          hint={`${range === 'all' ? 'lifetime' : `last ${range}`} · 10% of fee revenue`}
           accent
         />
         <Kpi
@@ -84,9 +84,9 @@ export function EarningsView({
         />
         <Kpi
           icon={Calendar}
-          label="Total deal value"
+          label="Total fee revenue"
           value={formatSGD(totals.totalFees, { compact: true })}
-          hint="combined fee revenue"
+          hint="firm billing (15% of salary)"
         />
       </div>
 
@@ -116,11 +116,11 @@ export function EarningsView({
               <th className="px-4 py-3 font-medium">Date</th>
               <th className="px-4 py-3 font-medium">Candidate</th>
               <th className="px-4 py-3 font-medium">Role / Client</th>
-              <th className="px-4 py-3 font-medium">Total fee</th>
+              <th className="px-4 py-3 font-medium">Fee revenue</th>
               {isDirector && <th className="px-4 py-3 font-medium">Consultant</th>}
               <th className="px-4 py-3 font-medium">My role</th>
               <th className="px-4 py-3 font-medium text-right">Split</th>
-              <th className="px-4 py-3 font-medium text-right">Amount</th>
+              <th className="px-4 py-3 font-medium text-right">Commission</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">

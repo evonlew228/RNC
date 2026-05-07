@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { StageBadge } from '@/components/StageBadge';
 import { EditCandidateDialog } from '@/components/EditCandidateDialog';
 import { DeleteCandidateButton } from '@/components/DeleteCandidateButton';
-import { feeFromJob, formatSGD, initials } from '@/lib/format';
+import { consultantCommission, feeFromJob, formatSGD, initials } from '@/lib/format';
 import type { Candidate } from '@/lib/supabase/types';
 
 export default async function CandidateDetailPage(props: { params: Promise<{ id: string }> }) {
@@ -114,7 +114,7 @@ export default async function CandidateDetailPage(props: { params: Promise<{ id:
                             <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] text-emerald-800">
                               {splits.map((sp, i) => (
                                 <span key={i}>
-                                  {sp.consultant.full_name}: {sp.pct}% ({formatSGD(Math.round((fee * Number(sp.pct)) / 100))})
+                                  {sp.consultant.full_name}: {sp.pct}% ({formatSGD(consultantCommission(fee, Number(sp.pct)))})
                                 </span>
                               ))}
                             </div>

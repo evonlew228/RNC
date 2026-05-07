@@ -13,6 +13,19 @@ export function feeFromJob(annualPackage: number | null, feePct: number): number
   return Math.round((annualPackage * feePct) / 100);
 }
 
+// Firm-wide commission rate: consultants are paid 10% of the fee revenue (firm keeps 90%).
+// e.g. on a SGD 100k annual placement at 15% fee = SGD 15k revenue → SGD 1,500 commission pool.
+export const COMMISSION_RATE = 0.10;
+
+export function commissionPool(fee: number): number {
+  return Math.round(fee * COMMISSION_RATE);
+}
+
+// Commission a consultant earns from a placement = pool × split %
+export function consultantCommission(fee: number, splitPct: number): number {
+  return Math.round((fee * COMMISSION_RATE * splitPct) / 100);
+}
+
 export function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);

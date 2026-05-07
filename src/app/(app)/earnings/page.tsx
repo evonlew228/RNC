@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/PageHeader';
 import { EarningsView } from '@/components/EarningsView';
-import { feeFromJob } from '@/lib/format';
+import { consultantCommission, feeFromJob } from '@/lib/format';
 import type { UserRole } from '@/lib/supabase/types';
 
 export type EarningsRow = {
@@ -70,7 +70,8 @@ export default async function EarningsPage() {
       placed_at: sub.closure_at ?? sub.updated_at,
       fee_total: fee,
       pct: Number(s.pct),
-      amount: Math.round((fee * Number(s.pct)) / 100),
+      // Consultant earns 10% of fee revenue × their split %
+      amount: consultantCommission(fee, Number(s.pct)),
       consultant_id: s.consultant_id,
       consultant_name: consultant.full_name,
       consultant_role: role,

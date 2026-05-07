@@ -19,7 +19,7 @@ import type { Profile } from '@/lib/supabase/types';
 import { ROLE_LABELS } from '@/lib/supabase/types';
 import { NotificationBell } from './NotificationBell';
 
-const NAV = [
+const NAV: { href: string; label: string; icon: typeof Home; directorOnly?: boolean }[] = [
   { href: '/desk', label: 'My desk', icon: Home },
   { href: '/pipeline', label: 'Pipeline', icon: KanbanSquare },
   { href: '/feed', label: 'Co-broke feed', icon: Radio },
@@ -27,7 +27,7 @@ const NAV = [
   { href: '/candidates', label: 'Candidates', icon: Users },
   { href: '/clients', label: 'Clients', icon: Building2 },
   { href: '/earnings', label: 'My earnings', icon: Wallet },
-  { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
+  { href: '/dashboard', label: 'Dashboard', icon: BarChart3, directorOnly: true },
 ];
 
 export function Sidebar({ profile }: { profile: Profile }) {
@@ -54,7 +54,7 @@ export function Sidebar({ profile }: { profile: Profile }) {
       </div>
 
       <nav className="flex-1 p-3 space-y-1">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.filter((n) => !n.directorOnly || profile.role === 'director').map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + '/');
           return (
             <Link

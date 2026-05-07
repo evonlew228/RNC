@@ -3,7 +3,7 @@ import { ArrowRight, AlertCircle, Trophy, Users, Briefcase, Radio, CheckCircle2,
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/PageHeader';
 import { StageBadge } from '@/components/StageBadge';
-import { feeFromJob, formatSGD, timeAgo } from '@/lib/format';
+import { consultantCommission, feeFromJob, formatSGD, timeAgo } from '@/lib/format';
 import type { PipelineStage, UserRole } from '@/lib/supabase/types';
 import { ROLE_LABELS } from '@/lib/supabase/types';
 
@@ -91,7 +91,7 @@ async function DirectorDesk() {
     const sub = sp.submission as unknown as { outcome: string; job: { annual_package_sgd: number | null; fee_pct: number } } | null;
     if (sub?.outcome !== 'placed') continue;
     const fee = feeFromJob(sub.job.annual_package_sgd, sub.job.fee_pct);
-    earnings.set(sp.consultant_id, (earnings.get(sp.consultant_id) ?? 0) + Math.round((fee * Number(sp.pct)) / 100));
+    earnings.set(sp.consultant_id, (earnings.get(sp.consultant_id) ?? 0) + consultantCommission(fee, Number(sp.pct)));
   }
 
   return (
@@ -210,7 +210,7 @@ async function KamDesk({ userId }: { userId: string }) {
   const earnedFees = (mySplits ?? []).reduce((sum, sp) => {
     const sub = sp.submission as unknown as { outcome: string; job: { annual_package_sgd: number | null; fee_pct: number } } | null;
     if (sub?.outcome !== 'placed') return sum;
-    return sum + Math.round((feeFromJob(sub.job.annual_package_sgd, sub.job.fee_pct) * Number(sp.pct)) / 100);
+    return sum + consultantCommission(feeFromJob(sub.job.annual_package_sgd, sub.job.fee_pct), Number(sp.pct));
   }, 0);
 
   return (
@@ -219,7 +219,7 @@ async function KamDesk({ userId }: { userId: string }) {
         <Kpi icon={Users} label="My clients" value={(clients?.length ?? 0).toString()} hint={`${openJobs.length} open roles`} />
         <Kpi icon={Briefcase} label="My open jobs" value={openJobs.length.toString()} hint={`${openJobs.filter((j) => j.co_broke_open).length} open for co-broke`} />
         <Kpi icon={Wallet} label="Weighted fees in flight" value={formatSGD(myWeightedFees, { compact: true })} hint="My pipeline" />
-        <Kpi icon={CheckCircle2} label="Earned (closed)" value={formatSGD(earnedFees, { compact: true })} hint="Click to view ledger" href="/earnings" />
+        <Kpi icon={CheckCircle2} label="My commission earned" value={formatSGD(earnedFees, { compact: true })} hint="Click to view ledger" href="/earnings" />
       </div>
 
       <Card title={`Available co-broke opportunities (${availableCobroke.length})`} icon={Radio} accent="brand">
@@ -232,7 +232,7 @@ async function KamDesk({ userId }: { userId: string }) {
               const owner = j.owner as unknown as { full_name: string } | null;
               const split = j.default_split as { originator: number; submitter: number } | null;
               const fee = feeFromJob(j.annual_package_sgd, j.fee_pct);
-              const myShare = split ? Math.round((fee * split.submitter) / 100) : 0;
+              const myShare = split ? consultantCommission(fee, split.submitter) : 0;
               return (
                 <li key={j.id}>
                   <Link href={`/jobs/${j.id}`} className="block py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded">
@@ -373,7 +373,7 @@ async function BdDesk({ userId }: { userId: string }) {
   const earnedFees = (mySplits ?? []).reduce((sum, sp) => {
     const sub = sp.submission as unknown as { outcome: string; job: { annual_package_sgd: number | null; fee_pct: number } } | null;
     if (sub?.outcome !== 'placed') return sum;
-    return sum + Math.round((feeFromJob(sub.job.annual_package_sgd, sub.job.fee_pct) * Number(sp.pct)) / 100);
+    return sum + consultantCommission(feeFromJob(sub.job.annual_package_sgd, sub.job.fee_pct), Number(sp.pct));
   }, 0);
 
   const inNegotiation = (mySubs ?? []).filter((s) => s.stage === 'negotiation').length;
@@ -384,7 +384,7 @@ async function BdDesk({ userId }: { userId: string }) {
         <Kpi icon={Radio} label="Co-broke open" value={untouched.length.toString()} hint="Available for me to submit" accent="brand" />
         <Kpi icon={Users} label="My active submissions" value={(mySubs?.length ?? 0).toString()} hint={`${inNegotiation} in negotiation`} />
         <Kpi icon={Wallet} label="Weighted fees in flight" value={formatSGD(myWeighted, { compact: true })} hint="My contributions" />
-        <Kpi icon={CheckCircle2} label="Earned (closed)" value={formatSGD(earnedFees, { compact: true })} hint="Click to view ledger" href="/earnings" />
+        <Kpi icon={CheckCircle2} label="My commission earned" value={formatSGD(earnedFees, { compact: true })} hint="Click to view ledger" href="/earnings" />
       </div>
 
       <Card title={`Co-broke opportunities (${untouched.length})`} icon={Radio} accent="brand">
@@ -396,7 +396,7 @@ async function BdDesk({ userId }: { userId: string }) {
               const client = j.client as unknown as { name: string };
               const split = j.default_split as { originator: number; submitter: number } | null;
               const fee = feeFromJob(j.annual_package_sgd, j.fee_pct);
-              const myShare = split ? Math.round((fee * split.submitter) / 100) : 0;
+              const myShare = split ? consultantCommission(fee, split.submitter) : 0;
               return (
                 <li key={j.id}>
                   <Link href={`/jobs/${j.id}`} className="block py-3 hover:bg-slate-50 -mx-2 px-2 rounded">

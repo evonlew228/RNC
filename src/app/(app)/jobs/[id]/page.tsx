@@ -9,7 +9,7 @@ import { SubmitCandidatePanel } from '@/components/SubmitCandidatePanel';
 import { MarkPlacedDialog } from '@/components/MarkPlacedDialog';
 import { SubmissionStatusActions } from '@/components/SubmissionStatusActions';
 import type { SubmissionOutcome } from '@/lib/supabase/types';
-import { feeFromJob, formatSGD } from '@/lib/format';
+import { consultantCommission, feeFromJob, formatSGD } from '@/lib/format';
 
 export default async function JobDetailPage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params;
@@ -136,7 +136,7 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
                         <div className="flex flex-wrap gap-3 text-emerald-800">
                           {splits.map((sp) => (
                             <span key={sp.consultant_id}>
-                              {sp.consultant.full_name}: {sp.pct}% ({formatSGD(Math.round((fee * Number(sp.pct)) / 100))})
+                              {sp.consultant.full_name}: {sp.pct}% commission ({formatSGD(consultantCommission(fee, Number(sp.pct)))})
                             </span>
                           ))}
                         </div>

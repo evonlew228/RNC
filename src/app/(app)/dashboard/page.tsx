@@ -1,7 +1,8 @@
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/PageHeader';
 import { DashboardCharts } from '@/components/DashboardCharts';
-import { feeFromJob, formatSGD } from '@/lib/format';
+import { commissionPool, consultantCommission, feeFromJob, formatSGD } from '@/lib/format';
 import type { PipelineStage } from '@/lib/supabase/types';
 
 const STAGE_WEIGHT: Record<PipelineStage, number> = {
@@ -13,25 +14,132 @@ const STAGE_WEIGHT: Record<PipelineStage, number> = {
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user!.id)
+    .single();
 
-  const [{ data: jobs }, { data: submissions }, { data: profiles }] = await Promise.all([
-    supabase
-      .from('jobs')
-      .select('id, title, annual_package_sgd, fee_pct, status, co_broke_open, owner_id, client:clients(name)'),
+  // Director-only
+  if (profile?.role !== 'director') redirect('/desk');
+
+  const [{ data: jobs }, { data: submissions }, { data: profiles }, { data: splits }] = await Promise.all([
+    supabase.from('jobs').select('id, status, co_broke_open, annual_package_sgd, fee_pct, owner_id'),
     supabase
       .from('submissions')
-      .select('id, stage, outcome, submitting_consultant_id, created_at, job:jobs(id, annual_package_sgd, fee_pct)'),
+      .select(
+        'id, stage, outcome, submitting_consultant_id, updated_at, job:jobs(id, owner_id, annual_package_sgd, fee_pct)'
+      ),
     supabase.from('profiles').select('id, full_name, role'),
+    supabase
+      .from('splits')
+      .select(
+        'pct, consultant_id, submission:submissions!inner(outcome, job:jobs(owner_id, annual_package_sgd, fee_pct))'
+      ),
   ]);
 
-  const totalFeesInFlight = (submissions ?? []).reduce((sum, s) => {
-    if (s.outcome !== 'open' && s.outcome !== 'placed') return sum;
+  // ── KPIs ──────────────────────────────────────────────────────
+  const openJobs = (jobs ?? []).filter((j) => j.status === 'open');
+
+  const totalFeeRevenue = (splits ?? []).reduce((sum, sp) => {
+    const sub = sp.submission as unknown as {
+      outcome: string;
+      job: { owner_id: string; annual_package_sgd: number | null; fee_pct: number };
+    } | null;
+    if (sub?.outcome !== 'placed') return sum;
+    // Avoid double-counting: only count fee once per submission
+    return sum;
+  }, 0);
+  // Compute fee revenue properly per unique placed submission
+  const placedSubmissions = new Map<
+    string,
+    { fee: number; ownerId: string; submitterId: string }
+  >();
+  for (const sp of splits ?? []) {
+    const sub = sp.submission as unknown as {
+      outcome: string;
+      job: { owner_id: string; annual_package_sgd: number | null; fee_pct: number };
+    } | null;
+    if (sub?.outcome !== 'placed') continue;
+  }
+  // Better: compute from submissions directly
+  const feeRevenuePerSubmission = new Map<string, number>();
+  const submissionMeta = new Map<string, { ownerId: string; submitterId: string }>();
+  for (const s of submissions ?? []) {
+    const j = s.job as unknown as {
+      id: string;
+      owner_id: string;
+      annual_package_sgd: number | null;
+      fee_pct: number;
+    } | null;
+    if (!j) continue;
+    submissionMeta.set(s.id, { ownerId: j.owner_id, submitterId: s.submitting_consultant_id });
+    if (s.outcome === 'placed') {
+      feeRevenuePerSubmission.set(s.id, feeFromJob(j.annual_package_sgd, j.fee_pct));
+    }
+  }
+  const feeRevenueTotal = Array.from(feeRevenuePerSubmission.values()).reduce((a, b) => a + b, 0);
+  const commissionPaidOut = Math.round(feeRevenueTotal * 0.10);
+
+  // Weighted in-flight COMMISSION (not fee — that's what the firm cares about for forecasting payout)
+  const weightedCommissionInFlight = (submissions ?? []).reduce((sum, s) => {
+    if (s.outcome !== 'open') return sum;
     const j = s.job as unknown as { annual_package_sgd: number | null; fee_pct: number };
     const fee = feeFromJob(j?.annual_package_sgd ?? 0, j?.fee_pct ?? 0);
-    return sum + fee * (STAGE_WEIGHT[s.stage as PipelineStage] ?? 0);
+    return sum + commissionPool(fee) * (STAGE_WEIGHT[s.stage as PipelineStage] ?? 0);
   }, 0);
 
-  // Stage counts
+  const placedThisMonth = (submissions ?? []).filter((s) => {
+    if (s.outcome !== 'placed') return false;
+    return new Date(s.updated_at).getTime() > Date.now() - 30 * 86400000;
+  }).length;
+
+  // ── Per-KAM commission earned ─────────────────────────────────
+  const profileMap = new Map<string, { name: string; role: string }>();
+  for (const p of profiles ?? []) profileMap.set(p.id, { name: p.full_name, role: p.role });
+
+  const perConsultantEarned = new Map<string, number>();
+  for (const sp of splits ?? []) {
+    const sub = sp.submission as unknown as {
+      outcome: string;
+      job: { annual_package_sgd: number | null; fee_pct: number };
+    } | null;
+    if (sub?.outcome !== 'placed') continue;
+    const fee = feeFromJob(sub.job.annual_package_sgd, sub.job.fee_pct);
+    const c = consultantCommission(fee, Number(sp.pct));
+    perConsultantEarned.set(sp.consultant_id, (perConsultantEarned.get(sp.consultant_id) ?? 0) + c);
+  }
+  const perKamData = Array.from(perConsultantEarned.entries())
+    .map(([id, value]) => ({
+      name: profileMap.get(id)?.name?.split(' ')[0] ?? 'Unknown',
+      role: profileMap.get(id)?.role ?? '',
+      commission: value,
+    }))
+    .sort((a, b) => b.commission - a.commission);
+
+  // ── Earnings vs In Flight ─────────────────────────────────────
+  const earningsVsInFlight = [
+    { label: 'Realised commission', value: commissionPaidOut },
+    { label: 'Weighted in-flight', value: Math.round(weightedCommissionInFlight) },
+  ];
+
+  // ── Co-broke vs Individual earnings ───────────────────────────
+  let coBrokeCommission = 0;
+  let individualCommission = 0;
+  for (const [subId, fee] of feeRevenuePerSubmission.entries()) {
+    const meta = submissionMeta.get(subId);
+    if (!meta) continue;
+    const isCobroke = meta.ownerId !== meta.submitterId;
+    if (isCobroke) coBrokeCommission += Math.round(fee * 0.10);
+    else individualCommission += Math.round(fee * 0.10);
+  }
+  const coBrokeData = [
+    { label: 'Individual', value: individualCommission, color: '#0d9488' },
+    { label: 'Co-broke', value: coBrokeCommission, color: '#0ea5e9' },
+  ];
+
+  // ── Stage distribution ───────────────────────────────────────
   const stageCounts: Record<PipelineStage, number> = {
     new_lead: 0,
     screening: 0,
@@ -39,83 +147,68 @@ export default async function DashboardPage() {
     closure: 0,
   };
   for (const s of submissions ?? []) {
-    stageCounts[s.stage as PipelineStage]++;
+    if (s.outcome === 'open') stageCounts[s.stage as PipelineStage]++;
   }
-
-  // Submissions per consultant (last 30 days)
-  const cutoff = Date.now() - 30 * 86400000;
-  const profileMap = new Map<string, string>();
-  for (const p of profiles ?? []) profileMap.set(p.id, p.full_name);
-  const perConsultant = new Map<string, number>();
-  for (const s of submissions ?? []) {
-    if (new Date(s.created_at).getTime() < cutoff) continue;
-    const name = profileMap.get(s.submitting_consultant_id) ?? 'Unknown';
-    perConsultant.set(name, (perConsultant.get(name) ?? 0) + 1);
-  }
-  const consultantBars = Array.from(perConsultant.entries()).map(([name, count]) => ({
-    name: name.split(' ')[0],
-    submissions: count,
-  }));
-
-  // Open roles
-  const openJobs = (jobs ?? []).filter((j) => j.status === 'open');
-  const coBrokeOpenCount = openJobs.filter((j) => j.co_broke_open).length;
-
-  // Submissions over time (last 30 days, by day)
-  const dayMap = new Map<string, number>();
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000);
-    dayMap.set(d.toISOString().slice(0, 10), 0);
-  }
-  for (const s of submissions ?? []) {
-    const day = s.created_at.slice(0, 10);
-    if (dayMap.has(day)) dayMap.set(day, (dayMap.get(day) ?? 0) + 1);
-  }
-  const trendData = Array.from(dayMap.entries()).map(([day, count]) => ({
-    day: day.slice(5),
-    count,
-  }));
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <PageHeader title="Dashboard" subtitle="Real-time view of pipeline health and BD activity." />
+      <PageHeader title="Director Dashboard" subtitle="Firm-wide pipeline, earnings, and commission split." />
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* KPI cards */}
         <div className="grid grid-cols-4 gap-4">
-          <KpiCard label="Open roles" value={openJobs.length.toString()} hint={`${coBrokeOpenCount} co-broke`} />
           <KpiCard
-            label="Weighted fees in flight"
-            value={formatSGD(totalFeesInFlight, { compact: true })}
-            hint="Probability-weighted"
+            label="Realised commission"
+            value={formatSGD(commissionPaidOut, { compact: true })}
+            hint={`${formatSGD(feeRevenueTotal, { compact: true })} fee revenue · 10% paid out`}
+            accent
           />
-          <KpiCard label="Active submissions" value={(submissions?.length ?? 0).toString()} hint="All stages" />
           <KpiCard
-            label="In negotiation"
-            value={stageCounts.negotiation.toString()}
-            hint={`${stageCounts.closure} closed`}
+            label="Weighted in-flight"
+            value={formatSGD(weightedCommissionInFlight, { compact: true })}
+            hint="Commission, probability-weighted"
+          />
+          <KpiCard
+            label="Open roles"
+            value={openJobs.length.toString()}
+            hint={`${openJobs.filter((j) => j.co_broke_open).length} co-broke`}
+          />
+          <KpiCard
+            label="Placed this month"
+            value={placedThisMonth.toString()}
+            hint="Last 30 days"
           />
         </div>
 
         <DashboardCharts
+          earningsVsInFlight={earningsVsInFlight}
+          perKamData={perKamData}
+          coBrokeData={coBrokeData}
           stageData={[
             { stage: 'New Candidate', count: stageCounts.new_lead },
             { stage: 'Screening', count: stageCounts.screening },
             { stage: 'Negotiation', count: stageCounts.negotiation },
             { stage: 'Closure', count: stageCounts.closure },
           ]}
-          consultantData={consultantBars}
-          trendData={trendData}
         />
       </div>
     </div>
   );
 }
 
-function KpiCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+function KpiCard({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="bg-white border border-border rounded-xl p-5">
+    <div className={`bg-white border rounded-xl p-5 ${accent ? 'border-emerald-200 bg-emerald-50/40' : 'border-border'}`}>
       <div className="text-xs text-muted">{label}</div>
-      <div className="text-2xl font-semibold text-slate-900 mt-1">{value}</div>
+      <div className={`text-2xl font-semibold mt-1 ${accent ? 'text-emerald-700' : 'text-slate-900'}`}>{value}</div>
       <div className="text-xs text-muted mt-1">{hint}</div>
     </div>
   );
