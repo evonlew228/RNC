@@ -80,6 +80,7 @@ export interface Candidate {
   resume_url: string | null;
   notes: string | null;
   added_by: string | null;
+  rest_until: string | null;
   created_at: string;
 }
 
@@ -126,5 +127,36 @@ export interface Activity {
   candidate_id: string | null;
   submission_id: string | null;
   payload: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export type NotificationKind =
+  | 'placed'
+  | 'placed_elsewhere'
+  | 'split_pending'
+  | 'split_approved'
+  | 'split_rejected'
+  | 'cobroke_opened';
+
+export interface Notification {
+  id: string;
+  recipient_id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string | null;
+  href: string | null;
+  payload: Record<string, unknown> | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface PendingPlacement {
+  id: string;
+  submission_id: string;
+  proposed_by: string;
+  proposed_splits: { consultant_id: string; pct: number; full_name: string }[];
+  status: 'pending' | 'approved' | 'rejected';
+  resolved_by: string | null;
+  resolved_at: string | null;
   created_at: string;
 }

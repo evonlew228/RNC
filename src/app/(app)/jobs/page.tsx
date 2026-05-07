@@ -2,9 +2,14 @@ import Link from 'next/link';
 import { Radio, Plus } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/PageHeader';
+import { SearchInput } from '@/components/SearchInput';
 import { feeFromJob, formatSGD } from '@/lib/format';
 
-export default async function JobsPage() {
+export default async function JobsPage(props: {
+  searchParams: Promise<{ q?: string; cobroke?: string }>;
+}) {
+  const sp = await props.searchParams;
+  const q = (sp.q ?? '').trim().toLowerCase();
   const supabase = await createClient();
   const { data: jobs } = await supabase
     .from('jobs')
@@ -16,11 +21,24 @@ export default async function JobsPage() {
     `)
     .order('created_at', { ascending: false });
 
+  const filtered = (jobs ?? []).filter((j) => {
+    if (!q) return true;
+    const client = j.client as unknown as { name: string } | null;
+    const owner = j.owner as unknown as { full_name: string } | null;
+    return (
+      j.title.toLowerCase().includes(q) ||
+      (j.role_type ?? '').toLowerCase().includes(q) ||
+      (client?.name ?? '').toLowerCase().includes(q) ||
+      (owner?.full_name ?? '').toLowerCase().includes(q) ||
+      (j.status ?? '').toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <PageHeader
         title="Jobs"
-        subtitle="Open vacancies across all accounts."
+        subtitle={q ? `${filtered.length} results for "${q}"` : 'Open vacancies across all accounts.'}
         actions={
           <Link
             href="/jobs/new"
@@ -31,7 +49,8 @@ export default async function JobsPage() {
           </Link>
         }
       />
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-6 space-y-4">
+        <SearchInput placeholder="Search by title, role, client, owner, or status…" />
         <div className="bg-white rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-muted">
@@ -46,7 +65,7 @@ export default async function JobsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {(jobs ?? []).map((j) => {
+              {filtered.map((j) => {
                 const client = j.client as unknown as { name: string } | null;
                 const owner = j.owner as unknown as { full_name: string } | null;
                 const submissions = (j.submissions ?? []) as unknown as { id: string; stage: string }[];
@@ -80,6 +99,13 @@ export default async function JobsPage() {
                   </tr>
                 );
               })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted">
+                    {q ? `No jobs match "${q}".` : 'No jobs yet.'}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

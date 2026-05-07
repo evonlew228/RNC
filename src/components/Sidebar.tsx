@@ -11,11 +11,13 @@ import {
   BarChart3,
   Radio,
   LogOut,
+  Wallet,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { createClient } from '@/lib/supabase/client';
 import type { Profile } from '@/lib/supabase/types';
 import { ROLE_LABELS } from '@/lib/supabase/types';
+import { NotificationBell } from './NotificationBell';
 
 const NAV = [
   { href: '/desk', label: 'My desk', icon: Home },
@@ -24,6 +26,7 @@ const NAV = [
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/candidates', label: 'Candidates', icon: Users },
   { href: '/clients', label: 'Clients', icon: Building2 },
+  { href: '/earnings', label: 'My earnings', icon: Wallet },
   { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
 ];
 
@@ -71,7 +74,8 @@ export function Sidebar({ profile }: { profile: Profile }) {
         })}
       </nav>
 
-      <div className="p-3 border-t border-border space-y-2">
+      <div className="p-3 border-t border-border space-y-1">
+        <NotificationBell userId={profile.id} />
         <div className="px-3 py-2 text-xs">
           <div className="font-medium text-slate-900">{profile.full_name}</div>
           <div className="text-muted">{ROLE_LABELS[profile.role]}</div>

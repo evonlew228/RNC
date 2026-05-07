@@ -13,6 +13,7 @@ interface CandidateOption {
   full_name: string;
   current_title: string | null;
   current_employer: string | null;
+  rest_until: string | null;
   open_submissions: { job: { id: string; title: string; client: { name: string } | null } | null }[];
 }
 
@@ -52,7 +53,7 @@ export function SubmitCandidatePanel({
       const { data } = await supabase
         .from('candidates')
         .select(`
-          id, full_name, current_title, current_employer,
+          id, full_name, current_title, current_employer, rest_until,
           submissions(outcome, job:jobs(id, title, client:clients(name)))
         `)
         .order('full_name')
@@ -70,6 +71,7 @@ export function SubmitCandidatePanel({
           full_name: c.full_name,
           current_title: c.current_title,
           current_employer: c.current_employer,
+          rest_until: c.rest_until,
           open_submissions,
         } as CandidateOption;
       });
@@ -87,8 +89,12 @@ export function SubmitCandidatePanel({
       (c.current_employer ?? '').toLowerCase().includes(query.toLowerCase())
   );
 
+  function isResting(candidate: CandidateOption): boolean {
+    return !!candidate.rest_until && new Date(candidate.rest_until) > new Date();
+  }
+
   function attemptSubmit(candidate: CandidateOption) {
-    if (candidate.open_submissions.length > 0) {
+    if (isResting(candidate) || candidate.open_submissions.length > 0) {
       setConflict({ candidate });
       return;
     }
@@ -247,6 +253,11 @@ export function SubmitCandidatePanel({
                           <div className="min-w-0 flex-1">
                             <div className="font-medium text-slate-900 truncate flex items-center gap-2">
                               {c.full_name}
+                              {isResting(c) && (
+                                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-medium">
+                                  Resting
+                                </span>
+                              )}
                               {c.open_submissions.length > 0 && (
                                 <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
                                   <Radio className="size-3" />
@@ -332,23 +343,46 @@ export function SubmitCandidatePanel({
                 <AlertTriangle className="size-5 text-amber-600" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-slate-900">Candidate already in flight</h3>
+                <h3 className="font-semibold text-slate-900">
+                  {isResting(conflict.candidate) ? 'Candidate is in rest period' : 'Candidate already in flight'}
+                </h3>
                 <p className="text-sm text-muted mt-1">
-                  <span className="font-medium text-slate-900">{conflict.candidate.full_name}</span>{' '}
-                  has open submission{conflict.candidate.open_submissions.length > 1 ? 's' : ''} on:
+                  <span className="font-medium text-slate-900">{conflict.candidate.full_name}</span>
                 </p>
-                <ul className="mt-2 space-y-1 text-sm">
-                  {conflict.candidate.open_submissions.map((s, i) => (
-                    s.job && (
-                      <li key={i} className="text-slate-700">
-                        • <span className="font-medium">{s.job.title}</span>
-                        {s.job.client && <> at {s.job.client.name}</>}
-                      </li>
-                    )
-                  ))}
-                </ul>
-                <p className="text-xs text-muted mt-2">
-                  Submitting them again is allowed but the team should coordinate to avoid double-placing.
+                {isResting(conflict.candidate) && conflict.candidate.rest_until && (
+                  <div className="mt-2 p-3 rounded-lg bg-purple-50 border border-purple-200 text-sm">
+                    <div className="font-medium text-purple-900">
+                      Resting until {new Date(conflict.candidate.rest_until).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </div>
+                    {conflict.candidate.current_employer && (
+                      <div className="text-xs text-purple-800 mt-0.5">
+                        Currently at {conflict.candidate.current_employer}
+                      </div>
+                    )}
+                    <div className="text-xs text-purple-800 mt-1">
+                      Industry-standard 12-month no-poach period after a placement.
+                    </div>
+                  </div>
+                )}
+                {conflict.candidate.open_submissions.length > 0 && (
+                  <>
+                    <p className="text-sm text-slate-700 mt-3">
+                      Open submission{conflict.candidate.open_submissions.length > 1 ? 's' : ''}:
+                    </p>
+                    <ul className="mt-1 space-y-1 text-sm">
+                      {conflict.candidate.open_submissions.map((s, i) => (
+                        s.job && (
+                          <li key={i} className="text-slate-700">
+                            • <span className="font-medium">{s.job.title}</span>
+                            {s.job.client && <> at {s.job.client.name}</>}
+                          </li>
+                        )
+                      ))}
+                    </ul>
+                  </>
+                )}
+                <p className="text-xs text-muted mt-3">
+                  Override only if you have explicit reason (e.g. candidate left the placed role early, or a documented exception).
                 </p>
               </div>
             </div>

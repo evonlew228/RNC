@@ -219,7 +219,7 @@ async function KamDesk({ userId }: { userId: string }) {
         <Kpi icon={Users} label="My clients" value={(clients?.length ?? 0).toString()} hint={`${openJobs.length} open roles`} />
         <Kpi icon={Briefcase} label="My open jobs" value={openJobs.length.toString()} hint={`${openJobs.filter((j) => j.co_broke_open).length} open for co-broke`} />
         <Kpi icon={Wallet} label="Weighted fees in flight" value={formatSGD(myWeightedFees, { compact: true })} hint="My pipeline" />
-        <Kpi icon={CheckCircle2} label="Earned (closed)" value={formatSGD(earnedFees, { compact: true })} hint="From placements" />
+        <Kpi icon={CheckCircle2} label="Earned (closed)" value={formatSGD(earnedFees, { compact: true })} hint="Click to view ledger" href="/earnings" />
       </div>
 
       <Card title={`Available co-broke opportunities (${availableCobroke.length})`} icon={Radio} accent="brand">
@@ -384,7 +384,7 @@ async function BdDesk({ userId }: { userId: string }) {
         <Kpi icon={Radio} label="Co-broke open" value={untouched.length.toString()} hint="Available for me to submit" accent="brand" />
         <Kpi icon={Users} label="My active submissions" value={(mySubs?.length ?? 0).toString()} hint={`${inNegotiation} in negotiation`} />
         <Kpi icon={Wallet} label="Weighted fees in flight" value={formatSGD(myWeighted, { compact: true })} hint="My contributions" />
-        <Kpi icon={CheckCircle2} label="Earned (closed)" value={formatSGD(earnedFees, { compact: true })} hint="From placements" />
+        <Kpi icon={CheckCircle2} label="Earned (closed)" value={formatSGD(earnedFees, { compact: true })} hint="Click to view ledger" href="/earnings" />
       </div>
 
       <Card title={`Co-broke opportunities (${untouched.length})`} icon={Radio} accent="brand">
@@ -480,23 +480,30 @@ function Kpi({
   value,
   hint,
   accent,
+  href,
 }: {
   icon: typeof Briefcase;
   label: string;
   value: string;
   hint?: string;
   accent?: 'brand';
+  href?: string;
 }) {
-  return (
-    <div className={`bg-white border rounded-xl p-5 ${accent === 'brand' ? 'border-brand/40 bg-brand-soft/20' : 'border-border'}`}>
+  const cls = `bg-white border rounded-xl p-5 ${accent === 'brand' ? 'border-brand/40 bg-brand-soft/20' : 'border-border'} ${href ? 'hover:border-brand transition cursor-pointer' : ''}`;
+  const content = (
+    <>
       <div className="flex items-center gap-2 text-xs text-muted">
         <Icon className="size-3.5" />
         {label}
       </div>
       <div className="text-2xl font-semibold text-slate-900 mt-1">{value}</div>
       {hint && <div className="text-xs text-muted mt-1">{hint}</div>}
-    </div>
+    </>
   );
+  if (href) {
+    return <Link href={href as never} className={cls}>{content}</Link>;
+  }
+  return <div className={cls}>{content}</div>;
 }
 
 function Card({

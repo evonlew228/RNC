@@ -3,22 +3,26 @@ import clsx from 'clsx';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/PageHeader';
 import { DeleteCandidateButton } from '@/components/DeleteCandidateButton';
+import { SearchInput } from '@/components/SearchInput';
 import { initials } from '@/lib/format';
 
-type Status = 'active' | 'placed' | 'dormant';
-type Filter = 'all' | 'active' | 'placed';
+type Status = 'active' | 'resting' | 'placed' | 'dormant';
+type Filter = 'all' | 'active' | 'resting' | 'placed';
 
 interface CandidateRow {
   id: string;
   full_name: string;
   current_title: string | null;
   current_employer: string | null;
+  rest_until: string | null;
   candidate_skills: { skill: { name: string } }[];
   submissions: { id: string; outcome: string }[];
 }
 
 function deriveStatus(c: CandidateRow): Status {
   const subs = c.submissions ?? [];
+  const isResting = c.rest_until && new Date(c.rest_until) > new Date();
+  if (isResting) return 'resting';
   if (subs.some((s) => s.outcome === 'open')) return 'active';
   if (subs.some((s) => s.outcome === 'placed')) return 'placed';
   return 'dormant';
@@ -26,28 +30,43 @@ function deriveStatus(c: CandidateRow): Status {
 
 const STATUS_BADGE: Record<Status, { label: string; cls: string }> = {
   active: { label: 'Active', cls: 'bg-blue-100 text-blue-800' },
-  placed: { label: 'Placed', cls: 'bg-emerald-100 text-emerald-800' },
+  resting: { label: 'Resting', cls: 'bg-purple-100 text-purple-800' },
+  placed: { label: 'Available', cls: 'bg-emerald-100 text-emerald-800' },
   dormant: { label: 'Dormant', cls: 'bg-slate-100 text-slate-600' },
 };
 
 export default async function CandidatesPage(props: {
-  searchParams: Promise<{ status?: Filter }>;
+  searchParams: Promise<{ status?: Filter; q?: string }>;
 }) {
-  const { status: filter = 'all' } = await props.searchParams;
+  const { status: filter = 'all', q: rawQ } = await props.searchParams;
+  const q = (rawQ ?? '').trim().toLowerCase();
   const supabase = await createClient();
   const { data: candidates } = await supabase
     .from('candidates')
     .select(`
-      id, full_name, current_title, current_employer,
+      id, full_name, current_title, current_employer, rest_until,
       candidate_skills(skill:skills(name)),
       submissions(id, outcome)
     `)
     .order('created_at', { ascending: false });
 
-  const all = (candidates ?? []) as unknown as CandidateRow[];
+  const allRaw = (candidates ?? []) as unknown as CandidateRow[];
+  const all = q
+    ? allRaw.filter((c) => {
+        const skills = (c.candidate_skills ?? []).map((s) => s.skill.name.toLowerCase()).join(' ');
+        return (
+          c.full_name.toLowerCase().includes(q) ||
+          (c.current_title ?? '').toLowerCase().includes(q) ||
+          (c.current_employer ?? '').toLowerCase().includes(q) ||
+          skills.includes(q)
+        );
+      })
+    : allRaw;
+
   const counts = {
     all: all.length,
     active: all.filter((c) => deriveStatus(c) === 'active').length,
+    resting: all.filter((c) => deriveStatus(c) === 'resting').length,
     placed: all.filter((c) => deriveStatus(c) === 'placed').length,
   };
   const filtered = filter === 'all' ? all : all.filter((c) => deriveStatus(c) === filter);
@@ -56,13 +75,15 @@ export default async function CandidatesPage(props: {
     <div className="flex flex-col h-screen overflow-hidden">
       <PageHeader
         title="Candidates"
-        subtitle={`${all.length} in the talent pool · ${counts.active} active · ${counts.placed} placed`}
+        subtitle={`${all.length} in the talent pool · ${counts.active} active · ${counts.resting} resting · ${counts.placed} available (post-rest)`}
       />
       <div className="flex-1 overflow-auto p-6 space-y-4">
+        <SearchInput placeholder="Search by name, role, employer, or skill…" />
         <div className="flex items-center gap-2">
-          <FilterTab href="/candidates" active={filter === 'all'} label="All" count={counts.all} />
-          <FilterTab href="/candidates?status=active" active={filter === 'active'} label="Active" count={counts.active} />
-          <FilterTab href="/candidates?status=placed" active={filter === 'placed'} label="Placed" count={counts.placed} />
+          <FilterTab href={q ? `/candidates?q=${encodeURIComponent(q)}` : '/candidates'} active={filter === 'all'} label="All" count={counts.all} />
+          <FilterTab href={`/candidates?status=active${q ? `&q=${encodeURIComponent(q)}` : ''}`} active={filter === 'active'} label="Active" count={counts.active} />
+          <FilterTab href={`/candidates?status=resting${q ? `&q=${encodeURIComponent(q)}` : ''}`} active={filter === 'resting'} label="Resting" count={counts.resting} />
+          <FilterTab href={`/candidates?status=placed${q ? `&q=${encodeURIComponent(q)}` : ''}`} active={filter === 'placed'} label="Available" count={counts.placed} />
         </div>
 
         <div className="bg-white rounded-xl border border-border overflow-hidden">
