@@ -23,9 +23,9 @@ const NAV: { href: string; label: string; icon: typeof Home; directorOnly?: bool
   { href: '/desk', label: 'My desk', icon: Home },
   { href: '/pipeline', label: 'Pipeline', icon: KanbanSquare },
   { href: '/feed', label: 'Co-broke feed', icon: Radio },
+  { href: '/clients', label: 'Clients', icon: Building2 },
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/candidates', label: 'Candidates', icon: Users },
-  { href: '/clients', label: 'Clients', icon: Building2 },
   { href: '/earnings', label: 'My earnings', icon: Wallet },
   { href: '/dashboard', label: 'Dashboard', icon: BarChart3, directorOnly: true },
 ];

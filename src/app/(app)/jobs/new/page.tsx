@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Upload, FileText, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/PageHeader';
@@ -14,9 +14,11 @@ interface ClientOption {
 
 export default function NewJobPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const presetClient = searchParams.get('client') ?? '';
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [form, setForm] = useState({
-    client_id: '',
+    client_id: presetClient,
     title: '',
     role_type: '',
     jd_summary: '',
@@ -37,10 +39,10 @@ export default function NewJobPage() {
       const { data } = await supabase.from('clients').select('id, name').order('name');
       setClients((data ?? []) as ClientOption[]);
       if (data && data.length > 0) {
-        setForm((f) => ({ ...f, client_id: f.client_id || data[0].id }));
+        setForm((f) => ({ ...f, client_id: f.client_id || presetClient || data[0].id }));
       }
     })();
-  }, []);
+  }, [presetClient]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
