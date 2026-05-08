@@ -20,12 +20,15 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
     .select(`
       *,
       client:clients(*),
-      owner:profiles!jobs_owner_id_fkey(id, full_name, role)
+      owner:profiles!jobs_owner_id_fkey(id, full_name, role),
+      job_skills(skill:skills(id, name))
     `)
     .eq('id', id)
     .single();
 
   if (!job) notFound();
+
+  const jobSkills = (job.job_skills ?? []) as unknown as { skill: { id: string; name: string } }[];
 
   const { data: submissions } = await supabase
     .from('submissions')
@@ -163,6 +166,23 @@ export default async function JobDetailPage(props: { params: Promise<{ id: strin
               <Row label="Fee" value={`${job.fee_pct}% · ${formatSGD(fee)}`} />
               <Row label="Status" value={job.status} />
             </dl>
+          </Section>
+
+          <Section title={`Required skills${jobSkills.length ? ` (${jobSkills.length})` : ''}`}>
+            {jobSkills.length === 0 ? (
+              <div className="text-sm text-muted">No skills tagged.</div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {jobSkills.map(({ skill }) => (
+                  <span
+                    key={skill.id}
+                    className="text-xs px-2 py-1 rounded bg-brand-soft text-brand-ink font-medium"
+                  >
+                    {skill.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </Section>
 
           <Section title="Co-broke">

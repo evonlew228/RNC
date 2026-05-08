@@ -216,7 +216,7 @@ async function KamDesk({ userId }: { userId: string }) {
   return (
     <>
       <div className="grid grid-cols-4 gap-4">
-        <Kpi icon={Users} label="My clients" value={(clients?.length ?? 0).toString()} hint={`${openJobs.length} open roles`} />
+        <Kpi icon={Users} label="My clients" value={(clients?.length ?? 0).toString()} hint="Click to view portfolio" href="/clients?owner=me" />
         <Kpi icon={Briefcase} label="My open jobs" value={openJobs.length.toString()} hint={`${openJobs.filter((j) => j.co_broke_open).length} open for co-broke`} />
         <Kpi icon={Wallet} label="Weighted fees in flight" value={formatSGD(myWeightedFees, { compact: true })} hint="My pipeline" />
         <Kpi icon={CheckCircle2} label="My commission earned" value={formatSGD(earnedFees, { compact: true })} hint="Click to view ledger" href="/earnings" />
@@ -267,27 +267,34 @@ async function KamDesk({ userId }: { userId: string }) {
           {!clients || clients.length === 0 ? (
             <Empty text="No accounts assigned." />
           ) : (
-            <ul className="divide-y divide-border">
-              {clients.map((c) => {
-                const cJobs = (c.jobs ?? []) as unknown as { id: string; status: string }[];
-                const contacts = (c.contacts ?? []) as unknown as { id: string }[];
-                return (
-                  <li key={c.id}>
-                    <Link href={`/clients/${c.id}`} className="block py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium text-slate-900">{c.name}</div>
-                          <div className="text-xs text-muted">{c.industry_segment}</div>
+            <>
+              <ul className="divide-y divide-border">
+                {clients.map((c) => {
+                  const cJobs = (c.jobs ?? []) as unknown as { id: string; status: string }[];
+                  const contacts = (c.contacts ?? []) as unknown as { id: string }[];
+                  return (
+                    <li key={c.id}>
+                      <Link href={`/clients/${c.id}`} className="block py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-slate-900">{c.name}</div>
+                            <div className="text-xs text-muted">{c.industry_segment}</div>
+                          </div>
+                          <div className="text-xs text-muted text-right">
+                            {cJobs.filter((j) => j.status === 'open').length} open · {contacts.length} contacts
+                          </div>
                         </div>
-                        <div className="text-xs text-muted text-right">
-                          {cJobs.filter((j) => j.status === 'open').length} open · {contacts.length} contacts
-                        </div>
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="mt-3 pt-3 border-t border-border">
+                <Link href={'/clients?owner=me' as never} className="text-sm text-brand hover:underline">
+                  View all my clients →
+                </Link>
+              </div>
+            </>
           )}
         </Card>
 

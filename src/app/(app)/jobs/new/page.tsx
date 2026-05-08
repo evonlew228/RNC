@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Upload, FileText, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/PageHeader';
+import { SkillsPicker, resolveSkillIds, type SkillTag } from '@/components/SkillsPicker';
 
 interface ClientOption {
   id: string;
@@ -26,6 +27,7 @@ export default function NewJobPage() {
     originator_pct: 60,
   });
   const [jdFile, setJdFile] = useState<File | null>(null);
+  const [skills, setSkills] = useState<SkillTag[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,6 +89,21 @@ export default function NewJobPage() {
       setError(error.message);
       setBusy(false);
       return;
+    }
+
+    // Resolve and write job_skills
+    if (skills.length > 0) {
+      try {
+        const skillIds = await resolveSkillIds(skills);
+        await supabase
+          .from('job_skills')
+          .insert(skillIds.map((skill_id) => ({ job_id: job.id, skill_id })));
+      } catch (skErr) {
+        console.error('skills attach failed', skErr);
+        setError(
+          'Job was created but skills failed to attach. Did you run migration 0008? You can add skills later by editing the job.'
+        );
+      }
     }
 
     await supabase.from('activities').insert([
@@ -159,6 +176,14 @@ export default function NewJobPage() {
               rows={4}
               placeholder="One per line, e.g.&#10;• 5+ years post-registration&#10;• MRI certification required&#10;• Available within 60 days"
               className="w-full px-3 py-2 border border-border rounded-lg font-mono text-sm"
+            />
+          </Field>
+
+          <Field label="Required skills">
+            <SkillsPicker
+              selected={skills}
+              onChange={setSkills}
+              placeholder="Type to search or add a new skill (e.g. ACLS, MRI-certified)…"
             />
           </Field>
 

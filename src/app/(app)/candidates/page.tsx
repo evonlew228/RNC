@@ -80,10 +80,36 @@ export default async function CandidatesPage(props: {
       <div className="flex-1 overflow-auto p-6 space-y-4">
         <SearchInput placeholder="Search by name, role, employer, or skill…" />
         <div className="flex items-center gap-2">
-          <FilterTab href={q ? `/candidates?q=${encodeURIComponent(q)}` : '/candidates'} active={filter === 'all'} label="All" count={counts.all} />
-          <FilterTab href={`/candidates?status=active${q ? `&q=${encodeURIComponent(q)}` : ''}`} active={filter === 'active'} label="Active" count={counts.active} />
-          <FilterTab href={`/candidates?status=resting${q ? `&q=${encodeURIComponent(q)}` : ''}`} active={filter === 'resting'} label="Resting" count={counts.resting} />
-          <FilterTab href={`/candidates?status=placed${q ? `&q=${encodeURIComponent(q)}` : ''}`} active={filter === 'placed'} label="Available" count={counts.placed} />
+          <FilterTab
+            href={q ? `/candidates?q=${encodeURIComponent(q)}` : '/candidates'}
+            active={filter === 'all'} label="All" count={counts.all}
+            tooltip="Every candidate in the talent pool, regardless of status."
+          />
+          <FilterTab
+            href={`/candidates?status=active${q ? `&q=${encodeURIComponent(q)}` : ''}`}
+            active={filter === 'active'} label="Active" count={counts.active}
+            tooltip="At least one open submission in the pipeline."
+          />
+          <FilterTab
+            href={`/candidates?status=resting${q ? `&q=${encodeURIComponent(q)}` : ''}`}
+            active={filter === 'resting'} label="Resting" count={counts.resting}
+            tooltip="Placed within the last 12 months. Non-poachable per industry norm."
+          />
+          <FilterTab
+            href={`/candidates?status=placed${q ? `&q=${encodeURIComponent(q)}` : ''}`}
+            active={filter === 'placed'} label="Available" count={counts.placed}
+            tooltip="Past placement, rest period over. Re-engageable alumni."
+          />
+        </div>
+
+        <div className="bg-white border border-border rounded-xl p-3">
+          <div className="text-xs font-medium text-muted uppercase tracking-wide mb-2">Status guide</div>
+          <div className="grid grid-cols-4 gap-3 text-xs">
+            <StatusExplain badge={STATUS_BADGE.active} desc="Open submission in pipeline." />
+            <StatusExplain badge={STATUS_BADGE.resting} desc="Placed in last 12 months — non-poachable." />
+            <StatusExplain badge={STATUS_BADGE.placed} desc="Past placement, rest expired — re-engageable." />
+            <StatusExplain badge={STATUS_BADGE.dormant} desc="No active or successful history." />
+          </div>
         </div>
 
         <div className="bg-white rounded-xl border border-border overflow-hidden">
@@ -166,15 +192,18 @@ function FilterTab({
   active,
   label,
   count,
+  tooltip,
 }: {
   href: string;
   active: boolean;
   label: string;
   count: number;
+  tooltip?: string;
 }) {
   return (
     <Link
       href={href}
+      title={tooltip}
       className={clsx(
         'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition border',
         active
@@ -192,5 +221,22 @@ function FilterTab({
         {count}
       </span>
     </Link>
+  );
+}
+
+function StatusExplain({
+  badge,
+  desc,
+}: {
+  badge: { label: string; cls: string };
+  desc: string;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className={clsx('inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium shrink-0 mt-0.5', badge.cls)}>
+        {badge.label}
+      </span>
+      <span className="text-slate-700 leading-tight">{desc}</span>
+    </div>
   );
 }
