@@ -12,6 +12,7 @@ import {
   Radio,
   LogOut,
   Wallet,
+  TrendingUp,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { createClient } from '@/lib/supabase/client';
@@ -27,6 +28,7 @@ const NAV: { href: string; label: string; icon: typeof Home; directorOnly?: bool
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/candidates', label: 'Candidates', icon: Users },
   { href: '/earnings', label: 'My earnings', icon: Wallet },
+  { href: '/performance', label: 'Performance', icon: TrendingUp },
   { href: '/dashboard', label: 'Dashboard', icon: BarChart3, directorOnly: true },
 ];
 
